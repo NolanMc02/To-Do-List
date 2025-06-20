@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tasks App</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Font: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #1a1a1a; /* Dark background */
+            color: #e0e0e0; /* Light text */
+        }
+        .scrollable-content {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+        }
+        .scrollable-content::-webkit-scrollbar {
+            display: none; /* Chrome, Safari, Opera */
+        }
+        .task-completed {
+            text-decoration: line-through;
+            color: #9ca3af; /* Gray out completed tasks */
+        }
+        /* Custom scrollbar for main content */
+        #taskBoardsContainer {
+            overflow-x: auto;
+            white-space: nowrap; /* Prevent wrapping of boards */
+            padding-bottom: 1rem; /* Space for scrollbar */
+        }
+        #taskBoardsContainer::-webkit-scrollbar {
+            height: 8px;
+        }
+        #taskBoardsContainer::-webkit-scrollbar-track {
+            background: #2c2c2c; /* Darker track */
+            border-radius: 10px;
+        }
+        #taskBoardsContainer::-webkit-scrollbar-thumb {
+            background: #555; /* Medium gray thumb */
+            border-radius: 10px;
+        }
+        #taskBoardsContainer::-webkit-scrollbar-thumb:hover {
+            background: #777; /* Lighter gray on hover */
+        }
+
+        /* Modal styling */
+        .modal {
+            display: none; /* Hidden by default */
+            position: fixed; /* Stay in place */
+            z-index: 1000; /* Sit on top */
+            left: 0;
+            top: 0;
+            width: 100%; /* Full width */
+            height: 100%; /* Full height */
+            overflow: auto; /* Enable scroll if needed */
+            background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-content {
+            background-color: #2c2c2c;
+            margin: auto;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            width: 90%;
+            max-width: 400px;
+            color: #e0e0e0;
+        }
+        .close-button {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .close-button:hover,
+        .close-button:focus {
+            color: #e0e0e0;
+            text-decoration: none;
+            cursor: pointer;
+        }
+        /* For the task options ellipsis */
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            background-color: #3a3a3a;
+            min-width: 160px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1;
+            border-radius: 8px;
+            right: 0;
+            top: 100%;
+            padding: 8px 0;
+        }
+        .dropdown-content button {
+            color: #e0e0e0;
+            padding: 8px 16px;
+            text-decoration: none;
+            display: block;
+            width: 100%;
+            text-align: left;
+            border-radius: 0;
+        }
+        .dropdown-content button:hover {
+            background-color: #4a4a4a;
+        }
+        .task-input-container {
+            position: relative;
+            background-color: #2c2c2c; /* Match modal background */
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 0.5rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            display: flex; /* Added flex */
+            flex-direction: column; /* Stacks children vertically */
+        }
+        .task-input-container input,
+        .task-input-container textarea {
+            background-color: #1a1a1a; /* Darker input background */
+            border: 1px solid #4a4a4a;
+            color: #e0e0e0;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+            width: 100%; /* Ensure inputs take full width */
+        }
+        .task-input-container input::placeholder,
+        .task-input-container textarea::placeholder {
+            color: #888;
+        }
+        .task-input-container button {
+            background-color: #4CAF50; /* Green Save button */
+            color: white;
+            padding: 0.5rem 1rem;
+            border-radius: 0.25rem;
+            cursor: pointer;
+            border: none;
+            transition: background-color 0.2s;
+        }
+        .task-input-container button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+    <!-- Left Sidebar -->
+    <aside class="w-64 bg-gray-800 flex flex-col p-4 shadow-xl">
+        <!-- Top Section -->
+        <div class="flex items-center mb-6">
+            <button class="text-gray-400 hover:text-white mr-3">
+                <i class="fas fa-bars text-xl"></i>
+            </button>
+            <h1 class="text-2xl font-bold">Tasks</h1>
+        </div>
+
+        <!-- Create Button -->
+        <button id="createButton" class="bg-blue-600 text-white p-3 rounded-lg flex items-center justify-center mb-6 shadow-md hover:bg-blue-700 transition-colors duration-200">
+            <i class="fas fa-plus mr-2"></i>
+            Create
+        </button>
+
+        <!-- Main Navigation (All tasks, Starred) -->
+        <nav class="mb-6">
+            <ul class="space-y-2">
+                <li>
+                    <button id="allTasksNav" class="flex items-center w-full p-2 rounded-lg text-left hover:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <i class="fas fa-list-ul mr-3 text-lg"></i>All tasks
+                    </button>
+                </li>
+                <li>
+                    <button id="starredNav" class="flex items-center w-full p-2 rounded-lg text-left hover:bg-gray-700 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                        <i class="fas fa-star mr-3 text-lg"></i>Starred
+                    </button>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Lists Section -->
+        <div class="flex-grow flex flex-col">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-semibold text-gray-400 uppercase">Lists</span>
+                <!-- Chevron for collapsing/expanding lists, not implemented yet -->
+                <button class="text-gray-400 hover:text-white hidden">
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+            </div>
+            <ul id="sidebarGroupList" class="space-y-1 overflow-y-auto scrollable-content flex-grow">
+                <!-- Group items will be rendered here -->
+            </ul>
+            <button id="createNewListBtn" class="mt-4 flex items-center text-blue-400 hover:text-blue-300 transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <i class="fas fa-plus mr-2 text-lg"></i>
+                Create new list
+            </button>
+        </div>
+
+        <!-- User ID display -->
+        <div class="mt-auto p-2 bg-gray-700 rounded-lg text-gray-300 text-center text-xs">
+            User ID: <span id="currentUserId" class="font-semibold break-all">Loading...</span>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main id="mainContent" class="flex-1 p-6 overflow-hidden">
+        <div id="taskBoardsContainer" class="flex space-x-6 h-full items-start">
+            <!-- Task boards will be rendered here dynamically -->
+            <p id="noBoardsMessage" class="absolute inset-0 flex items-center justify-center text-gray-400 text-lg mt-10">Create a new list to start organizing your tasks!</p>
+        </div>
+    </main>
+
+    <!-- Create New List Modal -->
+    <div id="newListModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 class="text-xl font-bold mb-4">Create New List</h2>
+            <input type="text" id="modalNewGroupInput" placeholder="List name" class="w-full p-3 mb-4 rounded-lg bg-gray-700 border border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <div class="flex items-center mb-4">
+                <label for="modalGroupColorInput" class="mr-3">Color:</label>
+                <input type="color" id="modalGroupColorInput" value="#60a5fa" class="p-1 rounded-lg border border-gray-600 cursor-pointer">
+            </div>
+            <button id="modalAddGroupBtn" class="bg-blue-600 text-white p-3 rounded-lg w-full hover:bg-blue-700 transition-colors duration-200">Add List</button>
+        </div>
+    </div>
+
+    <!-- Task Options Dropdown Modal -->
+    <div id="taskOptionsModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 class="text-xl font-bold mb-4">Task Options</h2>
+            <button id="deleteTaskModalBtn" class="bg-red-600 text-white p-3 rounded-lg w-full hover:bg-red-700 transition-colors duration-200 mb-2">Delete Task</button>
+            <button id="editTaskModalBtn" class="bg-blue-600 text-white p-3 rounded-lg w-full hover:bg-blue-700 transition-colors duration-200">Edit Task</button>
+        </div>
+    </div>
+
+    <!-- Edit Task Modal -->
+    <div id="editTaskModal" class="modal hidden">
+        <div class="modal-content">
+            <span class="close-button">&times;</span>
+            <h2 class="text-xl font-bold mb-4">Edit Task</h2>
+            <input type="text" id="editTaskTitleInput" placeholder="Task title" class="w-full p-3 mb-4 rounded-lg bg-gray-700 border border-gray-600 text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <textarea id="editTaskDescriptionInput" placeholder="Task description" class="w-full p-3 mb-4 rounded-lg bg-gray-700 border border-gray-600 text-white h-24 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+            <button id="saveTaskEditBtn" class="bg-green-600 text-white p-3 rounded-lg w-full hover:bg-green-700 transition-colors duration-200">Save Changes</button>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, query, orderBy, serverTimestamp, where, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables for Firebase instances
+        let app;
+        let db;
+        let auth;
+        let userId;
+        let currentAppId;
+
+        // State to keep track of currently selected view (e.g., 'allTasks', 'starred', or a specific groupId)
+        let currentView = 'allTasks'; // Default view to show all lists
+        let allGroups = []; // Cache all groups
+        let allTasks = []; // Cache all tasks
+        let currentTaskIdForModal = null; // To store taskId when options modal is open
+
+        // Get elements
+        const createButton = document.getElementById('createButton');
+        const allTasksNav = document.getElementById('allTasksNav');
+        const starredNav = document.getElementById('starredNav');
+        const sidebarGroupList = document.getElementById('sidebarGroupList');
+        const createNewListBtn = document.getElementById('createNewListBtn');
+        const currentUserIdDisplay = document.getElementById('currentUserId');
+        const taskBoardsContainer = document.getElementById('taskBoardsContainer');
+        const noBoardsMessage = document.getElementById('noBoardsMessage');
+
+        // Modals elements
+        const newListModal = document.getElementById('newListModal');
+        const closeModalButton = newListModal.querySelector('.close-button');
+        const modalNewGroupInput = document.getElementById('modalNewGroupInput');
+        const modalGroupColorInput = document.getElementById('modalGroupColorInput');
+        const modalAddGroupBtn = document.getElementById('modalAddGroupBtn');
+
+        const taskOptionsModal = document.getElementById('taskOptionsModal');
+        const closeTaskOptionsModalButton = taskOptionsModal.querySelector('.close-button');
+        const deleteTaskModalBtn = document.getElementById('deleteTaskModalBtn');
+        const editTaskModalBtn = document.getElementById('editTaskModalBtn');
+
+        const editTaskModal = document.getElementById('editTaskModal');
+        const closeEditTaskModalButton = editTaskModal.querySelector('.close-button');
+        const editTaskTitleInput = document.getElementById('editTaskTitleInput');
+        const editTaskDescriptionInput = document.getElementById('editTaskDescriptionInput');
+        const saveTaskEditBtn = document.getElementById('saveTaskEditBtn');
+
+
+        // Initialize Firebase
+        function initFirebase() {
+            try {
+                currentAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+
+                if (Object.keys(firebaseConfig).length === 0) {
+                    console.error("Firebase config not found. Cannot initialize Firebase.");
+                    return;
+                }
+
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        currentUserIdDisplay.textContent = userId;
+                        console.log("Authenticated as:", userId);
+                        setupFirestoreListeners();
+                        updateNavigationView(); // Ensure the correct navigation item is active on load
+                    } else {
+                        if (typeof __initial_auth_token !== 'undefined') {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                });
+
+            } catch (error) {
+                console.error("Error initializing Firebase:", error);
+            }
+        }
+
+        // Setup Firestore listeners for real-time updates
+        function setupFirestoreListeners() {
+            if (!db || !userId) {
+                console.warn("Firestore or User ID not available for listeners.");
+                return;
+            }
+
+            // Listen for changes in task groups
+            onSnapshot(collection(db, `artifacts/${currentAppId}/users/${userId}/taskGroups`), (snapshot) => {
+                allGroups = [];
+                snapshot.forEach(doc => {
+                    allGroups.push({ id: doc.id, ...doc.data() });
+                });
+                renderSidebarGroups();
+                renderMainContent(); // Re-render main content when groups change
+            }, (error) => {
+                console.error("Error listening to groups:", error);
+            });
+
+            // Listen for changes in tasks
+            onSnapshot(collection(db, `artifacts/${currentAppId}/users/${userId}/tasks`), (snapshot) => {
+                allTasks = [];
+                snapshot.forEach(doc => {
+                    allTasks.push({ id: doc.id, ...doc.data() });
+                });
+                renderMainContent(); // Re-render main content when tasks change
+            }, (error) => {
+                console.error("Error listening to tasks:", error);
+            });
+        }
+
+        // Render groups in the sidebar
+        function renderSidebarGroups() {
+            sidebarGroupList.innerHTML = '';
+            allGroups.sort((a, b) => (a.createdAt?.toDate() || 0) - (b.createdAt?.toDate() || 0));
+
+            allGroups.forEach(group => {
+                const listItem = document.createElement('li');
+                listItem.innerHTML = `
+                    <button class="flex items-center w-full p-2 rounded-lg text-left hover:bg-gray-700 transition-colors duration-200 group-nav-item" data-group-id="${group.id}">
+                        <div class="w-2 h-2 rounded-full mr-3" style="background-color: ${group.color};"></div>
+                        <span class="flex-grow">${group.name}</span>
+                        <span class="text-gray-400 text-sm">${allTasks.filter(task => task.groupId === group.id && !task.completed).length}</span>
+                    </button>
+                `;
+                sidebarGroupList.appendChild(listItem);
+            });
+            addSidebarGroupListeners();
+            updateNavigationView(); // Ensure correct nav item is active
+        }
+
+        // Render main content based on currentView
+        function renderMainContent() {
+            taskBoardsContainer.innerHTML = '';
+            noBoardsMessage.classList.add('hidden'); // Hide default message
+
+            if (allGroups.length === 0 && allTasks.length === 0) {
+                noBoardsMessage.classList.remove('hidden');
+                return;
+            }
+
+            if (currentView === 'allTasks') {
+                if (allGroups.length === 0) {
+                     noBoardsMessage.textContent = "No lists yet. Create a new list to start organizing your tasks!";
+                     noBoardsMessage.classList.remove('hidden');
+                     return;
+                }
+                // Display all task boards side-by-side
+                allGroups.sort((a, b) => (a.createdAt?.toDate() || 0) - (b.createdAt?.toDate() || 0));
+                allGroups.forEach(group => {
+                    taskBoardsContainer.appendChild(createTaskBoard(group));
+                });
+            } else if (currentView === 'starred') {
+                renderStarredTasksBoard();
+            } else { // Specific group selected
+                const selectedGroup = allGroups.find(g => g.id === currentView);
+                if (selectedGroup) {
+                    taskBoardsContainer.appendChild(createTaskBoard(selectedGroup));
+                } else {
+                    // If the selected group was deleted or doesn't exist, default to 'allTasks' view
+                    currentView = 'allTasks';
+                    renderMainContent();
+                    updateNavigationView();
+                }
+            }
+        }
+
+        // Creates a single task board (column) for a given group
+        function createTaskBoard(group) {
+            const board = document.createElement('div');
+            board.className = 'w-80 flex-shrink-0 bg-gray-800 rounded-lg shadow-lg flex flex-col p-4 mr-6';
+            board.innerHTML = `
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-semibold">${group.name}</h3>
+                    <button class="text-gray-400 hover:text-white group-options-btn" data-group-id="${group.id}">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                </div>
+                <button class="add-task-btn bg-gray-700 text-gray-300 p-2 rounded-lg w-full flex items-center justify-center mb-4 hover:bg-gray-600 transition-colors duration-200" data-group-id="${group.id}">
+                    <i class="fas fa-plus mr-2"></i>
+                    Add a task
+                </button>
+                <div class="flex-grow overflow-y-auto scrollable-content space-y-2 task-list-container">
+                    <!-- Tasks will be injected here -->
+                </div>
+                <div class="mt-4">
+                    <button class="text-gray-400 text-sm flex items-center hover:text-white completed-toggle-btn" data-group-id="${group.id}">
+                        <i class="fas fa-chevron-down mr-2"></i>
+                        <span>Completed (${allTasks.filter(task => task.groupId === group.id && task.completed).length})</span>
+                    </button>
+                    <div class="completed-tasks-list hidden mt-2 space-y-2">
+                        <!-- Completed tasks will be injected here -->
+                    </div>
+                </div>
+            `;
+
+            const taskListContainer = board.querySelector('.task-list-container');
+            const completedTasksList = board.querySelector('.completed-tasks-list');
+            const completedToggleBtn = board.querySelector('.completed-toggle-btn');
+            const groupOptionsBtn = board.querySelector('.group-options-btn');
+
+            // Group options button click listener
+            groupOptionsBtn.addEventListener('click', (event) => {
+                // For now, let's just make it delete the group
+                if (!db || !userId) return;
+                const groupIdToDelete = event.currentTarget.dataset.groupId;
+                if (confirm('Are you sure you want to delete this list and all its tasks?')) {
+                     try {
+                        deleteDoc(doc(db, `artifacts/${currentAppId}/users/${userId}/taskGroups`, groupIdToDelete));
+                        // Delete all tasks associated with this group using a batch for efficiency
+                        const tasksQuery = query(collection(db, `artifacts/${currentAppId}/users/${userId}/tasks`), where("groupId", "==", groupIdToDelete));
+                        getDocs(tasksQuery).then(tasksSnapshot => {
+                            const batch = writeBatch(db);
+                            tasksSnapshot.forEach(taskDoc => {
+                                batch.delete(taskDoc.ref);
+                            });
+                            batch.commit().then(() => {
+                                console.log("Group and associated tasks deleted successfully.");
+                            }).catch(e => {
+                                console.error("Error batch deleting tasks: ", e);
+                            });
+                        }).catch(e => {
+                            console.error("Error getting tasks for deletion: ", e);
+                        });
+                     } catch (e) {
+                         console.error("Error deleting group: ", e);
+                     }
+                }
+            });
+
+
+            const tasksForGroup = allTasks.filter(task => task.groupId === group.id);
+            const incompleteTasks = tasksForGroup.filter(task => !task.completed).sort((a, b) => (a.createdAt?.toDate() || 0) - (b.createdAt?.toDate() || 0));
+            const completeTasks = tasksForGroup.filter(task => task.completed).sort((a, b) => (a.createdAt?.toDate() || 0) - (b.createdAt?.toDate() || 0));
+
+            incompleteTasks.forEach(task => taskListContainer.appendChild(createTaskItem(task)));
+            completeTasks.forEach(task => completedTasksList.appendChild(createTaskItem(task)));
+
+            // Update completed tasks count in the toggle button
+            completedToggleBtn.querySelector('span').textContent = `Completed (${completeTasks.length})`;
+            if (completeTasks.length === 0) {
+                completedToggleBtn.style.display = 'none'; // Hide button if no completed tasks
+            }
+
+            // Add event listener for completed tasks toggle
+            completedToggleBtn.onclick = () => {
+                completedTasksList.classList.toggle('hidden');
+                const icon = completedToggleBtn.querySelector('i');
+                if (completedTasksList.classList.contains('hidden')) {
+                    icon.classList.remove('fa-chevron-up');
+                    icon.classList.add('fa-chevron-down');
+                } else {
+                    icon.classList.remove('fa-chevron-down');
+                    icon.classList.add('fa-chevron-up');
+                }
+            };
+
+            // Add event listener for add task button
+            board.querySelector('.add-task-btn').onclick = () => {
+                const inputContainer = document.createElement('div');
+                // Added flex and flex-col for vertical stacking
+                inputContainer.className = 'task-input-container flex flex-col';
+                inputContainer.innerHTML = `
+                    <input type="text" placeholder="Task title" class="w-full mb-2 task-title-input">
+                    <textarea placeholder="Description (optional)" class="w-full h-16 resize-none task-description-input"></textarea>
+                    <button class="save-new-task-btn">Add Task</button>
+                `;
+                taskListContainer.prepend(inputContainer); // Add input container at the top
+                const titleInput = inputContainer.querySelector('.task-title-input');
+                const descriptionInput = inputContainer.querySelector('.task-description-input');
+                const saveButton = inputContainer.querySelector('.save-new-task-btn');
+
+                titleInput.focus();
+
+                const saveTask = async () => {
+                    const taskText = titleInput.value.trim();
+                    const taskDescription = descriptionInput.value.trim();
+                    if (taskText) {
+                        try {
+                            await addDoc(collection(db, `artifacts/${currentAppId}/users/${userId}/tasks`), {
+                                text: taskText,
+                                description: taskDescription, // Save description
+                                completed: false,
+                                groupId: group.id,
+                                starred: false,
+                                createdAt: serverTimestamp()
+                            });
+                            inputContainer.remove(); // Remove input after adding
+                        } catch (e) {
+                            console.error("Error adding task: ", e);
+                        }
+                    } else {
+                        inputContainer.remove(); // Remove if empty title
+                    }
+                };
+
+                saveButton.addEventListener('click', saveTask);
+                titleInput.addEventListener('keypress', (event) => {
+                    if (event.key === 'Enter') {
+                        event.preventDefault(); // Prevent new line in input
+                        saveTask();
+                    }
+                });
+                descriptionInput.addEventListener('keypress', (event) => {
+                    if (event.key === 'Enter' && !event.shiftKey) { // Allow shift+enter for new line in textarea
+                        event.preventDefault();
+                        saveTask();
+                    }
+                });
+                inputContainer.addEventListener('blur', (event) => {
+                    // Check if the blur event is not due to clicking inside the container itself
+                    if (!inputContainer.contains(event.relatedTarget) && titleInput.value.trim() === '' && descriptionInput.value.trim() === '') {
+                        inputContainer.remove();
+                    }
+                }, true); // Use capture phase for blur to ensure it fires before child element blur
+            };
+
+            return board;
+        }
+
+        // Creates a single task item HTML
+        function createTaskItem(task) {
+            const taskItem = document.createElement('div');
+            taskItem.className = `flex flex-col bg-gray-700 p-3 rounded-lg shadow-sm mb-2 ${task.completed ? 'opacity-70' : ''}`;
+            taskItem.innerHTML = `
+                <div class="flex items-center w-full">
+                    <input type="checkbox" data-task-id="${task.id}" class="task-checkbox mr-3 h-4 w-4 rounded text-blue-500 focus:ring-blue-400 bg-gray-600 border-gray-500" ${task.completed ? 'checked' : ''}>
+                    <span class="flex-grow text-white font-medium ${task.completed ? 'task-completed' : ''}">${task.text}</span>
+                    <button class="task-options-btn text-gray-400 hover:text-white ml-2 relative" data-task-id="${task.id}">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
+                    <button class="star-task-btn text-gray-400 hover:text-yellow-400 ml-2 ${task.starred ? 'text-yellow-400' : ''}" data-task-id="${task.id}">
+                        <i class="${task.starred ? 'fas' : 'far'} fa-star"></i>
+                    </button>
+                </div>
+                ${task.description ? `<p class="text-gray-400 text-sm mt-1 ml-7 ${task.completed ? 'task-completed' : ''}">${task.description}</p>` : ''}
+            `;
+
+            taskItem.querySelector('.task-checkbox').onchange = async (event) => {
+                if (!db || !userId) return;
+                const taskId = event.target.dataset.taskId;
+                const completed = event.target.checked;
+                try {
+                    await updateDoc(doc(db, `artifacts/${currentAppId}/users/${userId}/tasks`, taskId), {
+                        completed: completed
+                    });
+                } catch (e) {
+                    console.error("Error updating task status: ", e);
+                }
+            };
+
+            const starButton = taskItem.querySelector('.star-task-btn');
+            starButton.onclick = async (event) => {
+                if (!db || !userId) return;
+                const taskId = event.currentTarget.dataset.taskId;
+                const isStarred = starButton.querySelector('i').classList.contains('fas');
+                try {
+                    await updateDoc(doc(db, `artifacts/${currentAppId}/users/${userId}/tasks`, taskId), {
+                        starred: !isStarred
+                    });
+                } catch (e) {
+                    console.error("Error updating task starred status: ", e);
+                }
+            };
+
+            const taskOptionsBtn = taskItem.querySelector('.task-options-btn');
+            taskOptionsBtn.onclick = (event) => {
+                currentTaskIdForModal = event.currentTarget.dataset.taskId;
+                taskOptionsModal.style.display = 'flex';
+            };
+
+
+            return taskItem;
+        }
+
+        // Render starred tasks board (single board)
+        function renderStarredTasksBoard() {
+            const starredTasks = allTasks.filter(task => task.starred);
+
+            if (starredTasks.length === 0) {
+                noBoardsMessage.textContent = "No starred tasks yet.";
+                noBoardsMessage.classList.remove('hidden');
+                return;
+            }
+
+            const starredTasksBoard = document.createElement('div');
+            starredTasksBoard.className = 'w-full flex-shrink-0 bg-gray-800 rounded-lg shadow-lg flex flex-col p-4';
+            starredTasksBoard.innerHTML = `
+                <h3 class="text-xl font-semibold mb-4">Starred Tasks</h3>
+                <div class="flex-grow overflow-y-auto scrollable-content space-y-2 task-list-container">
+                    <!-- Starred tasks will be injected here -->
+                </div>
+            `;
+
+            const taskListContainer = starredTasksBoard.querySelector('.task-list-container');
+            starredTasks.sort((a, b) => (a.createdAt?.toDate() || 0) - (b.createdAt?.toDate() || 0));
+
+            starredTasks.forEach(task => taskListContainer.appendChild(createTaskItem(task)));
+            taskBoardsContainer.appendChild(starredTasksBoard);
+        }
+
+        // Update active class for navigation items
+        function updateNavigationView() {
+            document.querySelectorAll('#sidebarGroupList button, #allTasksNav, #starredNav').forEach(btn => {
+                btn.classList.remove('bg-blue-700', 'font-bold');
+            });
+
+            if (currentView === 'allTasks') {
+                allTasksNav.classList.add('bg-blue-700', 'font-bold');
+            } else if (currentView === 'starred') {
+                starredNav.classList.add('bg-blue-700', 'font-bold');
+            } else {
+                const activeGroupNav = document.querySelector(`.group-nav-item[data-group-id="${currentView}"]`);
+                if (activeGroupNav) {
+                    activeGroupNav.classList.add('bg-blue-700', 'font-bold');
+                }
+            }
+        }
+
+        // Add event listeners for sidebar group items
+        function addSidebarGroupListeners() {
+            sidebarGroupList.querySelectorAll('.group-nav-item').forEach(button => {
+                button.onclick = (event) => {
+                    const groupId = event.currentTarget.dataset.groupId;
+                    currentView = groupId;
+                    renderMainContent();
+                    updateNavigationView();
+                };
+            });
+        }
+
+        // Event Listeners for main navigation
+        allTasksNav.addEventListener('click', () => {
+            currentView = 'allTasks';
+            renderMainContent();
+            updateNavigationView();
+        });
+
+        starredNav.addEventListener('click', () => {
+            currentView = 'starred';
+            renderMainContent();
+            updateNavigationView();
+        });
+
+        // Modal functionality
+        createNewListBtn.addEventListener('click', () => {
+            newListModal.style.display = 'flex';
+            modalNewGroupInput.focus();
+        });
+
+        createButton.addEventListener('click', () => {
+            newListModal.style.display = 'flex';
+            modalNewGroupInput.focus();
+        });
+
+        closeModalButton.addEventListener('click', () => {
+            newListModal.style.display = 'none';
+        });
+
+        closeTaskOptionsModalButton.addEventListener('click', () => {
+            taskOptionsModal.style.display = 'none';
+            currentTaskIdForModal = null;
+        });
+
+        closeEditTaskModalButton.addEventListener('click', () => {
+            editTaskModal.style.display = 'none';
+            currentTaskIdForModal = null;
+        });
+
+        window.addEventListener('click', (event) => {
+            if (event.target === newListModal) {
+                newListModal.style.display = 'none';
+            }
+            if (event.target === taskOptionsModal) {
+                taskOptionsModal.style.display = 'none';
+                currentTaskIdForModal = null;
+            }
+            if (event.target === editTaskModal) {
+                editTaskModal.style.display = 'none';
+                currentTaskIdForModal = null;
+            }
+        });
+
+        modalAddGroupBtn.addEventListener('click', async () => {
+            if (!db || !userId) {
+                console.error("Firestore or User ID not available.");
+                return;
+            }
+            const groupName = modalNewGroupInput.value.trim();
+            const groupColor = modalGroupColorInput.value;
+            if (groupName) {
+                try {
+                    const docRef = await addDoc(collection(db, `artifacts/${currentAppId}/users/${userId}/taskGroups`), {
+                        name: groupName,
+                        color: groupColor,
+                        createdAt: serverTimestamp()
+                    });
+                    modalNewGroupInput.value = '';
+                    newListModal.style.display = 'none';
+                    console.log("Group added with ID:", docRef.id);
+                    currentView = docRef.id; // Select the newly created group
+                    renderSidebarGroups();
+                    renderMainContent();
+                    updateNavigationView();
+                } catch (e) {
+                    console.error("Error adding document: ", e);
+                }
+            }
+        });
+
+        // Task Options Modal Buttons
+        deleteTaskModalBtn.addEventListener('click', async () => {
+            if (!db || !userId || !currentTaskIdForModal) return;
+            try {
+                await deleteDoc(doc(db, `artifacts/${currentAppId}/users/${userId}/tasks`, currentTaskIdForModal));
+                taskOptionsModal.style.display = 'none';
+                currentTaskIdForModal = null;
+            } catch (e) {
+                console.error("Error deleting task from modal: ", e);
+            }
+        });
+
+        editTaskModalBtn.addEventListener('click', () => {
+            if (!currentTaskIdForModal) return;
+            const taskToEdit = allTasks.find(task => task.id === currentTaskIdForModal);
+            if (taskToEdit) {
+                editTaskTitleInput.value = taskToEdit.text;
+                editTaskDescriptionInput.value = taskToEdit.description || '';
+                taskOptionsModal.style.display = 'none'; // Close options modal
+                editTaskModal.style.display = 'flex'; // Open edit modal
+                editTaskTitleInput.focus();
+            }
+        });
+
+        saveTaskEditBtn.addEventListener('click', async () => {
+            if (!db || !userId || !currentTaskIdForModal) return;
+            const updatedTitle = editTaskTitleInput.value.trim();
+            const updatedDescription = editTaskDescriptionInput.value.trim();
+
+            if (updatedTitle) {
+                try {
+                    await updateDoc(doc(db, `artifacts/${currentAppId}/users/${userId}/tasks`, currentTaskIdForModal), {
+                        text: updatedTitle,
+                        description: updatedDescription
+                    });
+                    editTaskModal.style.display = 'none';
+                    currentTaskIdForModal = null;
+                } catch (e) {
+                    console.error("Error saving task edits: ", e);
+                }
+            } else {
+                alert("Task title cannot be empty!"); // Consider a custom message box instead of alert
+            }
+        });
+
+
+        // Initialize the app on window load
+        window.onload = initFirebase;
+    </script>
+</body>
+</html>
