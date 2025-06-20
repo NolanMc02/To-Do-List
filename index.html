@@ -262,6 +262,28 @@
         let userId;
         let currentAppId;
 
+        // Firebase Configuration (REPLACE WITH YOUR OWN CONFIG WHEN DOWNLOADING)
+        // You can get this from your Firebase project settings -> Project settings -> General -> Your apps -> Web app
+        const userFirebaseConfig = {
+            apiKey: "YOUR_API_KEY", // Replace with your apiKey
+            authDomain: "YOUR_PROJECT_ID.firebaseapp.com", // Replace with your authDomain
+            projectId: "YOUR_PROJECT_ID", // Replace with your projectId
+            storageBucket: "YOUR_PROJECT_ID.appspot.com", // Replace with your storageBucket
+            messagingSenderId: "YOUR_MESSAGING_SENDER_ID", // Replace with your messagingSenderId
+            appId: "YOUR_APP_ID" // Replace with your appId
+        };
+        // It's recommended to set up security rules in Firestore to allow read/write access for authenticated users.
+        // For example:
+        // rules_version = '2';
+        // service cloud.firestore {
+        //   match /databases/{database}/documents {
+        //     match /artifacts/{appId}/users/{userId}/{document=**} {
+        //       allow read, write: if request.auth != null && request.auth.uid == userId;
+        //     }
+        //   }
+        // }
+
+
         // State to keep track of currently selected view (e.g., 'allTasks', 'starred', or a specific groupId)
         let currentView = 'allTasks'; // Default view to show all lists
         let allGroups = []; // Cache all groups
@@ -300,15 +322,24 @@
         // Initialize Firebase
         function initFirebase() {
             try {
-                currentAppId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-                const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+                // Determine currentAppId. In Canvas, use __app_id. When downloaded, use the projectId from user's config.
+                currentAppId = typeof __app_id !== 'undefined' ? __app_id : userFirebaseConfig.projectId || 'default-app-id';
 
-                if (Object.keys(firebaseConfig).length === 0) {
-                    console.error("Firebase config not found. Cannot initialize Firebase.");
-                    return;
+                let firebaseConfigToUse;
+                if (typeof __firebase_config !== 'undefined' && Object.keys(JSON.parse(__firebase_config)).length > 0) {
+                    // Running in Canvas environment, use provided config
+                    firebaseConfigToUse = JSON.parse(__firebase_config);
+                } else {
+                    // Running locally (downloaded), use user's hardcoded config
+                    firebaseConfigToUse = userFirebaseConfig;
+                    if (firebaseConfigToUse.apiKey === "YOUR_API_KEY") {
+                        console.warn("WARNING: You are running the app locally without your Firebase API Key configured. Data will not persist. Please replace 'YOUR_API_KEY' and other placeholder values in the userFirebaseConfig variable in the HTML file with your actual Firebase project credentials.");
+                        // To allow basic functionality without crashing, let's still try to initialize with the placeholder,
+                        // but data saving won't work correctly.
+                    }
                 }
 
-                app = initializeApp(firebaseConfig);
+                app = initializeApp(firebaseConfigToUse);
                 auth = getAuth(app);
                 db = getFirestore(app);
 
@@ -320,16 +351,19 @@
                         setupFirestoreListeners();
                         updateNavigationView(); // Ensure the correct navigation item is active on load
                     } else {
+                        // In Canvas, try custom token. When downloaded, fall back to anonymous.
                         if (typeof __initial_auth_token !== 'undefined') {
                             await signInWithCustomToken(auth, __initial_auth_token);
                         } else {
-                            await signInAnonymously(auth);
+                            await signInAnonymously(auth); // Fallback for downloaded HTML
                         }
                     }
                 });
 
             } catch (error) {
                 console.error("Error initializing Firebase:", error);
+                // Optionally display an error message to the user in the UI
+                currentUserIdDisplay.textContent = "Error loading!";
             }
         }
 
@@ -459,7 +493,9 @@
                 // For now, let's just make it delete the group
                 if (!db || !userId) return;
                 const groupIdToDelete = event.currentTarget.dataset.groupId;
-                if (confirm('Are you sure you want to delete this list and all its tasks?')) {
+                // Using a custom modal for confirmation instead of alert()
+                const confirmDelete = confirm("Are you sure you want to delete this list and all its tasks?"); // Using confirm for simplicity for now
+                if (confirmDelete) {
                      try {
                         deleteDoc(doc(db, `artifacts/${currentAppId}/users/${userId}/taskGroups`, groupIdToDelete));
                         // Delete all tasks associated with this group using a batch for efficiency
